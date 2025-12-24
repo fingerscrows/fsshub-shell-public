@@ -2,14 +2,18 @@ local RunService = game:GetService("RunService")
 local StatsService = game:GetService("Stats")
 
 -- [FIX V3] Dual Mode Load (Local Source vs Online Release)
-local Fluent
+local Fluent, SaveManager, InterfaceManager
 if script and script.Parent and script.Parent:FindFirstChild("Fluent") then
     -- Mode Studio/Rojo (Local Source)
     Fluent = require(script.Parent.Fluent.src)
+    SaveManager = require(script.Parent.Fluent.Addons.SaveManager)
+    InterfaceManager = require(script.Parent.Fluent.Addons.InterfaceManager)
 else
     -- Mode Executor/Live Test (Online)
     -- Kita pakai versi stabil untuk test agar tidak ribet pathing
     Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+    SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+    InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 end
 
 -- Main Entry Point ... (sisanya sama)
@@ -93,6 +97,22 @@ return function(ApiClient, Session)
         end
     })
 
+    -- Setup SaveManager & InterfaceManager
+    SaveManager:SetLibrary(Fluent)
+    InterfaceManager:SetLibrary(Fluent)
+
+    -- Ignore list (Security Patching: Phase A1)
+    SaveManager:SetIgnoreIndexes({'AutoFarm', 'ESP', 'WalkSpeed', 'JumpPower'})
+
+    -- Build Interface Section
+    InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+
+    -- Build SaveManager Section
+    SaveManager:BuildConfigSection(Tabs.Settings)
+
+    -- Set Folder
+    SaveManager:SetFolder("FSSHUB_V3")
+
     -- Update Loop (FPS, Ping, TTL)
     task.spawn(function()
         while Window do
@@ -136,6 +156,9 @@ return function(ApiClient, Session)
         Content = "Shell initialized successfully.",
         Duration = 5
     })
+
+    -- Load Autoload Config
+    SaveManager:LoadAutoloadConfig()
 
     return Window
 end
