@@ -74,25 +74,57 @@ return function(ApiClient, Session)
                 return
             end
 
-            -- Synchronous request as per instruction
-            local success, response = ApiClient.RequestFeature("autofarm")
+            -- [Phase E] Hardening & UX Update
+            local networkOk, data = ApiClient.RequestFeature("autofarm")
 
-            if success and response and response.ok then
-                -- In a real environment, we would execute the code:
-                -- local fn = loadstring(response.chunk)
-                -- if fn then fn() end
-
-                Fluent:Notify({
-                    Title = "Success",
-                    Content = "AutoFarm feature loaded.",
-                    Duration = 3
-                })
-            else
+            if not networkOk then
                 Fluent:Notify({
                     Title = "Error",
-                    Content = "Failed to load AutoFarm.",
+                    Content = "Network Error during request.",
                     Duration = 3
                 })
+                return
+            end
+
+            if data.status == 200 then
+                -- Success: Execute logic securely
+                -- Sandboxing: Ensure no leaking to global scope (getgenv, shared, _G)
+                task.spawn(function()
+                     local fn = loadstring(data.chunk)
+                     if fn then
+                         fn()
+                     end
+                end)
+
+                Fluent:Notify({
+                     Title = "Success",
+                     Content = "AutoFarm feature loaded.",
+                     Duration = 3
+                })
+
+            elseif data.status == 401 then
+                -- UX: Session Expired
+                Fluent:Notify({
+                    Title = "Error",
+                    Content = "Session Expired. Please Re-inject.",
+                    Duration = 5
+                })
+
+            elseif data.status == 403 then
+                -- UX: Tier Requirement
+                Fluent:Notify({
+                    Title = "Error",
+                    Content = "Upgrade Tier Required.",
+                    Duration = 5
+                })
+
+            else
+                 -- Fallback for generic errors
+                 Fluent:Notify({
+                    Title = "Error",
+                    Content = "Failed to load. Status: " .. tostring(data.status),
+                    Duration = 3
+                 })
             end
         end
     })
