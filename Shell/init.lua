@@ -1,8 +1,18 @@
 local RunService = game:GetService("RunService")
 local StatsService = game:GetService("Stats")
 
--- Require Fluent source as per instruction (Sibling module access)
-local Fluent = require(script.Parent.Fluent.src)
+-- [FIX V3] Dual Mode Load (Local Source vs Online Release)
+local Fluent
+if script and script.Parent and script.Parent:FindFirstChild("Fluent") then
+    -- Mode Studio/Rojo (Local Source)
+    Fluent = require(script.Parent.Fluent.src)
+else
+    -- Mode Executor/Live Test (Online)
+    -- Kita pakai versi stabil untuk test agar tidak ribet pathing
+    Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+end
+
+-- Main Entry Point ... (sisanya sama)
 
 -- Main Entry Point
 return function(ApiClient, Session)
