@@ -8,36 +8,48 @@ function Signal.new()
 end
 
 function Signal:Connect(callback)
+    assert(type(callback) == "function", "Callback must be a function")
     table.insert(self._callbacks, callback)
 
-    return {
-        Disconnect = function()
-            for i, v in ipairs(self._callbacks) do
-                if v == callback then
-                    table.remove(self._callbacks, i)
-                    break
-                end
+    local connection = {
+        Connected = true
+    }
+
+    function connection:Disconnect()
+        if not connection.Connected then return end
+        connection.Connected = false
+
+        for i, v in ipairs(self._callbacks) do
+            if v == callback then
+                table.remove(self._callbacks, i)
+                break
             end
         end
-    }
+    end
+
+    return connection
 end
 
 function Signal:Fire(...)
     for _, callback in ipairs(self._callbacks) do
-        if task and task.spawn then
-            task.spawn(callback, ...)
-        else
-            coroutine.wrap(callback)(...)
-        end
+        task.spawn(callback, ...)
     end
 end
 
--- Events Module
-local Events = {
-    Signal = Signal,
-    -- Signals for communication with Core
-    Request = Signal.new(), -- For HTTP requests proxied to Core
-    Message = Signal.new(), -- General messages
-}
+function Signal:Wait()
+    local thread = coroutine.running()
 
-return Events
+    local connection
+    connection = self:Connect(function(...)
+        connection:Disconnect()
+        task.spawn(thread, ...)
+    end)
+
+    return coroutine.yield()
+end
+
+function Signal:Destroy()
+    self._callbacks = {}
+end
+
+return Signal
