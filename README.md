@@ -64,3 +64,15 @@ Tabs.Main:AddButton({
 
 *   **Fluent UI Library**: Created by [dawid-scripts](https://github.com/dawid-scripts). Used as the foundation for the UI interface.
 *   **FSSHUB Team**: For the V3 Architecture and implementation.
+
+## Security & Sandboxing
+
+This shell is designed to run in a restricted environment:
+*   **No Global Pollution**: Scripts executed via the Shell are prohibited from writing to `getgenv`, `shared`, or `_G`.
+*   **Network Isolation**: All network requests must go through the injected `ApiClient`. Direct `request()` calls are forbidden.
+
+For detailed architecture documentation, see [docs/architecture.md](docs/architecture.md).
+
+## Internal Modules
+
+*   **`Shell/Events.lua`**: A pure Lua Signal class implementation. *Note: Currently not used by the main dashboard logic but available for internal event signaling.*
