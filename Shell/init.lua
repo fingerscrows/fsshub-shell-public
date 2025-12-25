@@ -88,19 +88,36 @@ return function(ApiClient, Session)
 
             if data.status == 200 then
                 -- Success: Execute logic securely
-                -- Sandboxing: Ensure no leaking to global scope (getgenv, shared, _G)
+                -- Improved Error Handling: Catch compilation and runtime errors
                 task.spawn(function()
-                     local fn = loadstring(data.chunk)
-                     if fn then
-                         fn()
-                     end
-                end)
+                    local fn, compileErr = loadstring(data.chunk)
+                    if not fn then
+                        warn("[Sentinel] Script Compilation Failed:", compileErr)
+                        Fluent:Notify({
+                            Title = "Error",
+                            Content = "Script Compilation Failed",
+                            Duration = 3
+                        })
+                        return
+                    end
 
-                Fluent:Notify({
-                     Title = "Success",
-                     Content = "AutoFarm feature loaded.",
-                     Duration = 3
-                })
+                    -- Execute safely
+                    local success, runtimeErr = pcall(fn)
+                    if not success then
+                        warn("[Sentinel] Feature Runtime Error:", runtimeErr)
+                        Fluent:Notify({
+                            Title = "Error",
+                            Content = "Script Execution Failed",
+                            Duration = 3
+                        })
+                    else
+                        Fluent:Notify({
+                            Title = "Success",
+                            Content = "AutoFarm feature loaded.",
+                            Duration = 3
+                        })
+                    end
+                end)
 
             elseif data.status == 401 then
                 -- UX: Session Expired
