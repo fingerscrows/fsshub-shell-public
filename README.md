@@ -2,65 +2,59 @@
 
 ## Overview
 
-This repository contains the **Stateless UI Shell** for **FSSHUB V3**, built using the **Fluent UI Library**. It serves as the visual interface for the FSSHUB system, providing a sleek "Cyber/Neon" aesthetic and a modular dashboard structure.
+This repository contains the **Stateless UI Shell** for **FSSHUB V3**, built using the **Fluent UI Library**. It serves as the visual interface for the FSSHUB system.
 
-This project is strictly the **UI layer**. It does not contain the core game logic, which is loaded dynamically from the private core repository.
+**Role**: "Remote Control"
+*   This project is strictly the **UI layer**.
+*   It does **not** contain core game logic or anti-cheat bypasses.
+*   It communicates with the private Core via BindableEvents.
 
-## Dependency Injection (Important)
+## Architecture
 
-**⚠️ This Shell cannot run standalone.**
+### Loading Mechanism
+The Shell is designed to be loaded dynamically via `loadstring`. It fetches its dependencies (Fluent, Addons) and internal modules directly from GitHub to ensure users always receive the latest interface updates without script restarts.
 
-The `Shell/init.lua` module is designed to be required and executed by a private **Loader**. It follows a **Dependency Injection** pattern where the Loader must inject the following instances:
-
-*   **`ApiClient`**: Handles all network communication with the Cloudflare Worker backend.
-*   **`Session`**: Manages the current user's session data and authentication state.
-
-**Entry Point Signature:**
 ```lua
-return function(ApiClient, Session)
-    -- UI Logic starts here
-end
+local Shell = loadstring(game:HttpGet(".../Shell/init.lua"))()
+Shell.Boot()
 ```
 
-Attempting to run `Shell/init.lua` directly without these dependencies will result in errors.
+### The Global Bridge
+Upon booting, the Shell exposes its Event Bus to the global environment, allowing the private Core to attach listeners.
+
+```lua
+getgenv().FSSHUB_SHELL = {
+    Events = { ... }, -- BindableEvents for communication
+    Instance = Window -- The Fluent Window instance
+}
+```
+
+### Communication Protocol
+*   **Shell -> Core**: Emits `ToggleFeature(id, state)` when a user interacts with the UI.
+*   **Core -> Shell**: Emits `FeatureState(id, state)` to update the UI visually if the feature is toggled externally (e.g., by game logic).
 
 ## Directory Structure
 
-*   **`Fluent/`**: Contains the full source code of the Fluent UI Library.
-    *   `src/`: The core library modules (renamed from `Fluent-1.1.0` to support modular requiring).
-*   **`Shell/`**: Contains the specific dashboard logic for FSSHUB.
-    *   `init.lua`: The main entry point that constructs the UI, handles tabs, and connects events.
-    *   `Events.lua`: A lightweight Signal class for internal UI event handling.
+*   **`Shell/`**: The runtime code.
+    *   `init.lua`: Main entry point. Sets up the Window and Global Bridge.
+    *   `Events.lua`: Signal management.
+    *   `UI/`: Dashboard modules (Tabs, Components). loaded via Raw URL by `init.lua`.
+*   **`Fluent/`**: Source code reference for the UI library. (Note: Runtime currently loads Fluent from remote URL, not this local folder).
 
 ## Customization
 
 ### Theme
-The UI uses a **Cyber Neon** theme by default. You can customize this in `Shell/init.lua` within the `Fluent:Construct` options:
+The UI uses a **Cyber Neon** theme.
+*   **Base**: Dark
+*   **Accent**: Neon Cyan (`0, 255, 255`)
 
-```lua
-Fluent:Construct({
-    Title = "FSS HUB V3",
-    Theme = "Dark", -- Base theme
-    Accent = Color3.fromRGB(0, 255, 255), -- Neon Cyan Accent
-    -- ...
-})
-```
+### Adding Features
+To add a button/toggle:
+1.  Edit `Shell/UI/Tabs.lua`.
+2.  Add the element.
+3.  Ensure it emits `ToggleFeature`.
 
-### Adding Buttons
-To add new functionality, locate the relevant Tab section in `Shell/init.lua` (e.g., `Tabs.Main`).
-
-Example:
-```lua
-Tabs.Main:AddButton({
-    Title = "New Feature",
-    Description = "Description of the feature",
-    Callback = function()
-        -- Handle click
-    end
-})
-```
+*Note: Since the script loads from GitHub Raw, you must push changes to see them in-game, or modify the `REPO` variable in `Shell/init.lua` for local testing.*
 
 ## Credits
-
-*   **Fluent UI Library**: Created by [dawid-scripts](https://github.com/dawid-scripts). Used as the foundation for the UI interface.
-*   **FSSHUB Team**: For the V3 Architecture and implementation.
+*   **Fluent UI Library**: [dawid-scripts](https://github.com/dawid-scripts).

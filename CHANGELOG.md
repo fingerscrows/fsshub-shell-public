@@ -2,18 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- **Architecture Update**: Updated documentation to reflect the actual "Raw Load" architecture.
+- **Dependency Handling**: Clarified that `Shell/init.lua` loads dependencies (Fluent, Modules) via `game:HttpGet` rather than local requires.
+- **Removed**: Removed "Dependency Injection" section from docs as the current code does not implement `function(ApiClient, Session)`.
+
 ## [3.0.0] - 2025-12-24 (Cyber Shell)
 
 ### Added
-- **Integrasi Penuh Source Code Fluent UI**: Integrated the full Fluent UI source code locally (instead of `loadstring`) to ensure stability on Delta/Xeno executors.
-- **Dependency Injection**: `Shell/init.lua` now implements the Dependency Injection pattern, requiring `ApiClient` and `Session` as arguments.
+- **Global Bridge**: `getgenv().FSSHUB_SHELL` is now the primary interface for Core communication.
+- **Cyber Neon Theme**: Default theme set to Dark with Cyan accent.
 
-### Feature
-- **Cyber Neon Dashboard**: New UI theme with Real-time FPS, Ping, and Session TTL monitoring.
-- **Settings Tab**: Automatic configuration management using `SaveManager` and `InterfaceManager`.
-
-### Fixed
-- **Require Paths**: Corrected require paths to support the modular folder structure (`script.Parent.Fluent.src`).
+### Changed
+- **Loading Strategy**: Switched to `loadstring` based loading for Fluent and internal UI modules to facilitate auto-updates.
+- **Stateless Design**: Shell logic decoupled from Game Logic. UI only emits events.
 
 ### Integration
 - **AutoFarm Launch**: Added 'Launch AutoFarm' button connected to Cloudflare KV via Events.
