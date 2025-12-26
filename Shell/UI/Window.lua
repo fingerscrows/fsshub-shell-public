@@ -1,20 +1,23 @@
 local Window = {}
 
 -- Requires Fluent from Root (Shell/UI/Window.lua -> UI -> Shell -> Root -> Fluent)
--- Adjust path if necessary. Based on user request "script.Parent.Parent.Fluent" from Init,
--- From Window (Shell/UI/Window.lua), it is script.Parent.Parent.Parent.Fluent
-local Fluent = require(script.Parent.Parent.Parent.Fluent)
+local Fluent = require(script.Parent.Parent.Parent.Fluent.src)
 
 function Window.Create()
     local Win = Fluent:CreateWindow({
-        Title = "FSSHub Shell",
-        SubTitle = "by Jules",
+        Title = "FSSHUB V3",
+        SubTitle = "Universal",
         TabWidth = 160,
         Size = UDim2.fromOffset(580, 460),
         Acrylic = true,
-        Theme = "Aqua", -- Request: Cyber/Neon (Cyan Accent, Dark Background). Aqua is closest default.
+        Theme = "Dark",
         MinimizeKey = Enum.KeyCode.LeftControl
     })
+
+    -- Enforce Cyber/Neon Accent (Neon Cyan)
+    if Fluent.Options then
+        Fluent.Options.Accent = Color3.fromRGB(0, 255, 255)
+    end
 
     return Win, Fluent
 end

@@ -1,196 +1,50 @@
-local RunService = game:GetService("RunService")
-local StatsService = game:GetService("Stats")
+local Events = require(script.Events)
+local WindowModule = require(script.UI.Window)
+local TabsModule = require(script.UI.Tabs)
 
--- [FIX V3] Dual Mode Load (Local Source vs Online Release)
-local Fluent, SaveManager, InterfaceManager
-if script and script.Parent and script.Parent:FindFirstChild("Fluent") then
-    -- Mode Studio/Rojo (Local Source)
-    Fluent = require(script.Parent.Fluent.src)
-    SaveManager = require(script.Parent.Fluent.Addons.SaveManager)
-    InterfaceManager = require(script.Parent.Fluent.Addons.InterfaceManager)
-else
-    -- Mode Executor/Live Test (Online)
-    -- Kita pakai versi stabil untuk test agar tidak ribet pathing
-    Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-    SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-    InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+-- Requires Fluent Addons (Shell/init.lua -> Shell -> Root -> Fluent -> Addons)
+local SaveManager = require(script.Parent.Fluent.Addons.SaveManager)
+local InterfaceManager = require(script.Parent.Fluent.Addons.InterfaceManager)
+
+-- Helper to get global environment safely
+local function getGlobal()
+    return (getgenv and getgenv()) or _G or shared
 end
 
--- Main Entry Point ... (sisanya sama)
-
 -- Main Entry Point
+-- Arg 'ApiClient' and 'Session' are accepted for signature compatibility
+-- but NOT used for logic, strictly adhering to "Dumb Shell" rules.
 return function(ApiClient, Session)
-    local Window = Fluent:CreateWindow({
-        Title = "FSSHUB V3",
-        SubTitle = "Cyber Dashboard",
-        TabWidth = 160,
-        Size = UDim2.fromOffset(580, 460),
-        Acrylic = true,
-        Theme = "Dark",
-        MinimizeKey = Enum.KeyCode.LeftControl
-    })
+    -- 1. Initialize Window
+    local Window, Fluent = WindowModule.Create()
 
-    -- Enforce Cyber/Neon Accent via Options as requested
-    -- We assume Fluent allows setting this in Options or it's a specific instruction to populate this table
-    Fluent.Options.Accent = Color3.fromRGB(0, 255, 255)
+    -- 2. Build Tabs (Home, Universal, Settings)
+    -- Passes Events for wiring, and Managers for Settings tab
+    TabsModule.Build(Window, Fluent, Events, SaveManager, InterfaceManager)
 
-    -- Tabs
-    local Tabs = {
-        Dashboard = Window:AddTab({ Title = "Dashboard", Icon = "layout-dashboard" }),
-        Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
-    }
-
-    local Options = Fluent.Options
-
-    -- Dashboard Features
-    local Section = Tabs.Dashboard:AddSection("Status")
-
-    local FPSParagraph = Tabs.Dashboard:AddParagraph({
-        Title = "FPS",
-        Content = "Calculating..."
-    })
-
-    local PingParagraph = Tabs.Dashboard:AddParagraph({
-        Title = "Ping",
-        Content = "Calculating..."
-    })
-
-    local SessionParagraph = Tabs.Dashboard:AddParagraph({
-        Title = "Session TTL",
-        Content = "Calculating..."
-    })
-
-    -- Vault Integration
-    Tabs.Dashboard:AddButton({
-        Title = "Launch AutoFarm",
-        Description = "Vault Integration",
-        Callback = function()
-            if not ApiClient then
-                Fluent:Notify({
-                    Title = "Error",
-                    Content = "ApiClient not initialized.",
-                    Duration = 3
-                })
-                return
-            end
-
-            -- [Phase E] Hardening & UX Update
-            local networkOk, data = ApiClient.RequestFeature("autofarm")
-
-            if not networkOk then
-                Fluent:Notify({
-                    Title = "Error",
-                    Content = "Network Error during request.",
-                    Duration = 3
-                })
-                return
-            end
-
-            if data.status == 200 then
-                -- Success: Execute logic securely
-                -- Sandboxing: Ensure no leaking to global scope (getgenv, shared, _G)
-                task.spawn(function()
-                     local fn = loadstring(data.chunk)
-                     if fn then
-                         fn()
-                     end
-                end)
-
-                Fluent:Notify({
-                     Title = "Success",
-                     Content = "AutoFarm feature loaded.",
-                     Duration = 3
-                })
-
-            elseif data.status == 401 then
-                -- UX: Session Expired
-                Fluent:Notify({
-                    Title = "Error",
-                    Content = "Session Expired. Please Re-inject.",
-                    Duration = 5
-                })
-
-            elseif data.status == 403 then
-                -- UX: Tier Requirement
-                Fluent:Notify({
-                    Title = "Error",
-                    Content = "Upgrade Tier Required.",
-                    Duration = 5
-                })
-
-            else
-                 -- Fallback for generic errors
-                 Fluent:Notify({
-                    Title = "Error",
-                    Content = "Failed to load. Status: " .. tostring(data.status),
-                    Duration = 3
-                 })
-            end
-        end
-    })
-
-    -- Setup SaveManager & InterfaceManager
-    SaveManager:SetLibrary(Fluent)
-    InterfaceManager:SetLibrary(Fluent)
-
-    -- Ignore list (Security Patching: Phase A1)
-    SaveManager:SetIgnoreIndexes({'AutoFarm', 'ESP', 'WalkSpeed', 'JumpPower'})
-
-    -- Build Interface Section
-    InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-
-    -- Build SaveManager Section
-    SaveManager:BuildConfigSection(Tabs.Settings)
-
-    -- Set Folder
-    SaveManager:SetFolder("FSSHUB_V3")
-
-    -- Update Loop (FPS, Ping, TTL)
-    task.spawn(function()
-        while Window do
-            -- FPS
-            local fps = math.floor(workspace:GetRealPhysicsFPS())
-            FPSParagraph:SetDesc(tostring(fps))
-
-            -- Ping
-            -- Stats.Network.ServerStatsItem["Data Ping"] might be nil in some contexts, strictly speaking,
-            -- but commonly used in Roblox exploits/clients.
-            local pingValue = 0
-            pcall(function()
-                pingValue = StatsService.Network.ServerStatsItem["Data Ping"]:GetValue()
-            end)
-            local ping = math.floor(pingValue)
-            PingParagraph:SetDesc(tostring(ping) .. " ms")
-
-            -- TTL
-            if Session and Session.Expire then
-                local timeLeft = Session.Expire - os.time()
-                if timeLeft > 0 then
-                    local h = math.floor(timeLeft / 3600)
-                    local m = math.floor((timeLeft % 3600) / 60)
-                    local s = timeLeft % 60
-                    SessionParagraph:SetDesc(string.format("%02d:%02d:%02d", h, m, s))
-                else
-                    SessionParagraph:SetDesc("Expired")
-                end
-            else
-                SessionParagraph:SetDesc("N/A")
-            end
-
-            task.wait(1)
-        end
-    end)
-
+    -- 3. Select Default Tab
     Window:SelectTab(1)
 
+    -- 4. Expose Bridge to Global Environment
+    -- The Private Core will look for this global to attach its listeners.
+    local G = getGlobal()
+    if G then
+        G.FSSHUB_SHELL = {
+            Events = Events._bridge
+        }
+    end
+
+    -- 5. Notify Load
     Fluent:Notify({
         Title = "FSSHUB V3",
-        Content = "Shell initialized successfully.",
+        Content = "Shell initialized. Waiting for Core...",
         Duration = 5
     })
 
-    -- Load Autoload Config
-    SaveManager:LoadAutoloadConfig()
+    -- 6. Load Autoload Config (if any)
+    if SaveManager then
+        SaveManager:LoadAutoloadConfig()
+    end
 
     return Window
 end
