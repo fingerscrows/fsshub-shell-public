@@ -1,50 +1,47 @@
-local Events = require(script.Events)
-local WindowModule = require(script.UI.Window)
-local TabsModule = require(script.UI.Tabs)
-
--- Requires Fluent Addons (Shell/init.lua -> Shell -> Root -> Fluent -> Addons)
-local SaveManager = require(script.Parent.Fluent.Addons.SaveManager)
-local InterfaceManager = require(script.Parent.Fluent.Addons.InterfaceManager)
+local Shell = {}
 
 -- Helper to get global environment safely
-local function getGlobal()
-    return (getgenv and getgenv()) or _G or shared
-end
+local getgenv = getgenv or function() return _G or shared end
 
--- Main Entry Point
--- Arg 'ApiClient' and 'Session' are accepted for signature compatibility
--- but NOT used for logic, strictly adhering to "Dumb Shell" rules.
-return function(ApiClient, Session)
-    -- 1. Initialize Window
-    local Window, Fluent = WindowModule.Create()
+-- Repo Base URL for Raw Load
+local REPO = "https://raw.githubusercontent.com/fingerscrows/fsshub-shell-public/main/Shell/"
 
-    -- 2. Build Tabs (Home, Universal, Settings)
-    -- Passes Events for wiring, and Managers for Settings tab
-    TabsModule.Build(Window, Fluent, Events, SaveManager, InterfaceManager)
+-- Load Fluent & Addons (Raw Load)
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
-    -- 3. Select Default Tab
-    Window:SelectTab(1)
+-- Load Internal Modules (Raw Load from Repo)
+local EventsModule = loadstring(game:HttpGet(REPO .. "Events.lua"))()
+local TabsModule = loadstring(game:HttpGet(REPO .. "UI/Tabs.lua"))()
 
-    -- 4. Expose Bridge to Global Environment
-    -- The Private Core will look for this global to attach its listeners.
-    local G = getGlobal()
-    if G then
-        G.FSSHUB_SHELL = {
-            Events = Events._bridge
-        }
-    end
-
-    -- 5. Notify Load
-    Fluent:Notify({
-        Title = "FSSHUB V3",
-        Content = "Shell initialized. Waiting for Core...",
-        Duration = 5
+function Shell.Boot()
+    local Window = Fluent:CreateWindow({
+        Title = "FSSHUB V3", SubTitle = "Public Shell",
+        TabWidth = 160, Size = UDim2.fromOffset(580, 460),
+        Acrylic = true, Theme = "Dark", MinimizeKey = Enum.KeyCode.LeftControl
     })
 
-    -- 6. Load Autoload Config (if any)
-    if SaveManager then
-        SaveManager:LoadAutoloadConfig()
-    end
+    local Bridge = EventsModule.Init()
+    -- EXPOSE GLOBAL BRIDGE
+    getgenv().FSSHUB_SHELL = { Events = Bridge.Signals, Instance = Window }
 
-    return Window
+    local UniversalTab = TabsModule.CreateUniversal(Window, Bridge)
+    local SettingsTab = Window:AddTab({ Title = "Settings", Icon = "settings" })
+
+    SaveManager:SetLibrary(Fluent)
+    InterfaceManager:SetLibrary(Fluent)
+    InterfaceManager:BuildInterfaceSection(SettingsTab)
+    SaveManager:BuildConfigSection(SettingsTab)
+
+    Window:SelectTab(1)
+
+    if Bridge.Signals.Notification then
+        Bridge.Signals.Notification.Event:Connect(function(t, c, d)
+            Fluent:Notify({ Title = t, Content = c, Duration = d or 5 })
+        end)
+    end
+    print("🎨 Shell Loaded.")
 end
+
+return Shell
