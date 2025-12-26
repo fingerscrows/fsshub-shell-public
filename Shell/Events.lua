@@ -1,55 +1,27 @@
-local Signal = {}
-Signal.__index = Signal
+local Events = {}
 
-function Signal.new()
-    local self = setmetatable({}, Signal)
-    self._callbacks = {}
-    return self
+-- Store internal BindableEvents
+local Bindables = {
+    Command = Instance.new("BindableEvent"),
+    StatusUpdate = Instance.new("BindableEvent"),
+    FeatureState = Instance.new("BindableEvent")
+}
+
+-- Public Interface for the Shell
+Events.Signals = {
+    OnStatusUpdate = Bindables.StatusUpdate.Event,
+    FeatureState = Bindables.FeatureState.Event
+}
+
+-- Function to send commands to the Core (Shell -> Core)
+function Events.Emit(commandName, ...)
+    Bindables.Command:Fire(commandName, ...)
 end
 
-function Signal:Connect(callback)
-    assert(type(callback) == "function", "Callback must be a function")
-    table.insert(self._callbacks, callback)
+-- Bridge Interface for the Core (Exposed via Global)
+-- The Core will use these to:
+-- 1. Listen to 'Command' (Shell -> Core)
+-- 2. Fire 'StatusUpdate' and 'FeatureState' (Core -> Shell)
+Events._bridge = Bindables
 
-    local connection = {
-        Connected = true
-    }
-
-    function connection:Disconnect()
-        if not connection.Connected then return end
-        connection.Connected = false
-
-        for i, v in ipairs(self._callbacks) do
-            if v == callback then
-                table.remove(self._callbacks, i)
-                break
-            end
-        end
-    end
-
-    return connection
-end
-
-function Signal:Fire(...)
-    for _, callback in ipairs(self._callbacks) do
-        task.spawn(callback, ...)
-    end
-end
-
-function Signal:Wait()
-    local thread = coroutine.running()
-
-    local connection
-    connection = self:Connect(function(...)
-        connection:Disconnect()
-        task.spawn(thread, ...)
-    end)
-
-    return coroutine.yield()
-end
-
-function Signal:Destroy()
-    self._callbacks = {}
-end
-
-return Signal
+return Events
