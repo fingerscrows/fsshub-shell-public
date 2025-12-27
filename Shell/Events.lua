@@ -2,8 +2,8 @@ local Events = {}
 
 function Events.Init()
     local container = {}
-    local signals = { "ToggleFeature" } -- Outgoing
-    local listeners = { "Notification", "FeatureState" } -- Incoming
+    local signals = { "ToggleFeature", "TryLogin" } -- Outgoing
+    local listeners = { "Notification", "FeatureState", "AuthResult" } -- Incoming
 
     container.Signals = {}
 
