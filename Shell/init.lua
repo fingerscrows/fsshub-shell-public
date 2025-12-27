@@ -87,16 +87,23 @@ function Shell.Boot(ApiClient, Session)
 
     LoginTab:AddButton({
         Title = "Get Key",
-        Description = "Copy Key Link",
+        Description = "Copy link to get a key system",
         Callback = function()
+            local keyLink = "https://link-to-your-key-system.com"
             if setclipboard then
-                setclipboard("https://link-to-key-system.com")
+                setclipboard(keyLink)
+                Fluent:Notify({
+                    Title = "Success",
+                    Content = "Key link copied to clipboard!",
+                    Duration = 5
+                })
+            else
+                Fluent:Notify({
+                    Title = "Error",
+                    Content = "Executor does not support clipboard.",
+                    Duration = 5
+                })
             end
-            Fluent:Notify({
-                Title = "Key System",
-                Content = "Link copied to clipboard",
-                Duration = 5
-            })
         end
     })
 
