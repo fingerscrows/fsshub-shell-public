@@ -1,47 +1,47 @@
 local Tabs = {}
 
-function Tabs.CreateUniversal(Window, Events, ApiClient, Fluent)
+function Tabs.CreateUniversal(Window, Bridge, ApiClient, Fluent)
     local Tab = Window:AddTab({ Title = "Universal", Icon = "globe" })
-    Tab:AddSection("Movement Features")
+    local Section = Tab:AddSection("Main Features")
 
-    local function createToggle(id, title)
-        local toggle = Tab:AddToggle(id, { Title = title, Default = false })
+    -- Safe Toggle Pattern Implementation
+    local function CreateSafeToggle(id, title)
+        local Toggle = Section:AddToggle(id, { Title = title, Default = false })
         local isProgrammatic = false
 
-        toggle:OnChanged(function()
+        Toggle:OnChanged(function()
             if isProgrammatic then return end
 
-            local success, _ = ApiClient.RequestFeature(id, toggle.Value)
+            local Value = Toggle.Value
+
+            -- SAFE TOGGLE LOGIC
+            if Value == false then
+                -- Disable: Local Action Only (Guard Network Call)
+                return
+            end
+
+            -- Enable: Network Action
+            local success, _ = ApiClient.RequestFeature(id)
+
+            -- FAILURE HANDLING
             if not success then
                 isProgrammatic = true
-                toggle:SetValue(not toggle.Value)
-                isProgrammatic = false
+                Toggle:SetValue(false) -- Revert
+                isProgrammatic = false -- Recursion Guard
 
-                if Fluent then
-                    Fluent:Notify({
-                        Title = "Connection Failed",
-                        Content = "Failed to toggle feature. Please check your connection.",
-                        Duration = 3
-                    })
-                end
+                Fluent:Notify({
+                    Title = "Connection Failed",
+                    Content = "Failed to enable " .. title,
+                    Duration = 3
+                })
             end
         end)
-
-        -- Sync Listener
-        if Events.Signals.FeatureState then
-            Events.Signals.FeatureState.Event:Connect(function(fId, state)
-                if fId == id then
-                    isProgrammatic = true
-                    toggle:SetValue(state)
-                    isProgrammatic = false
-                end
-            end)
-        end
     end
 
-    createToggle("speedwalk", "Speed Walk")
-    createToggle("jumppower", "Jump Power")
-    createToggle("gravity", "Low Gravity")
+    -- Feature Implementations
+    CreateSafeToggle("speed_hack", "Speed Hack")
+    CreateSafeToggle("jump_power", "Jump Power")
+    CreateSafeToggle("esp_master", "ESP")
 
     return Tab
 end
