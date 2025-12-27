@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.0] - 2026-01-18
+
+### Added
+- **Documentation**: Created `docs/architecture.md` and `docs/audit-log.md` to formalize the system architecture.
+- **Audit Log**: Initialized DocsKeeper audit log for tracking architectural shifts.
+
+### Changed
+- **Architecture Documentation**: Explicitly defined the "Remote Control" vs "TV Box" philosophy and "Safe Toggle Pattern".
+- **README**: Updated to reflect the current "Raw Load" mechanism (where Fluent is loaded via HTTP) and marked the local `Fluent/` directory as reference/dead code.
+
 ## [3.0.0] - 2025-12-24 (Cyber Shell)
 
 ### Added
