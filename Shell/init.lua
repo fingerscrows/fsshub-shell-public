@@ -7,7 +7,16 @@ local getgenv = getgenv or function() return _G or shared end
 local REPO = "https://raw.githubusercontent.com/fingerscrows/fsshub-shell-public/main/Shell/"
 
 -- Load Fluent & Addons (Raw Load)
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local success, result = pcall(function()
+    local raw = game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua")
+    return loadstring(raw)()
+end)
+
+if not success then
+    warn("❌ Fluent UI Load Failed: " .. tostring(result))
+    return
+end
+local Fluent = result
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
