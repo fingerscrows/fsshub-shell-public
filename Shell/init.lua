@@ -15,7 +15,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 local EventsModule = loadstring(game:HttpGet(REPO .. "Events.lua"))()
 local TabsModule = loadstring(game:HttpGet(REPO .. "UI/Tabs.lua"))()
 
-function Shell.Boot()
+function Shell.Boot(ApiClient, Session)
     local Window = Fluent:CreateWindow({
         Title = "FSSHUB V3", SubTitle = "Public Shell",
         TabWidth = 160, Size = UDim2.fromOffset(580, 460),
@@ -25,6 +25,17 @@ function Shell.Boot()
     local Bridge = EventsModule.Init()
     -- EXPOSE GLOBAL BRIDGE
     getgenv().FSSHUB_SHELL = { Events = Bridge.Signals, Instance = Window }
+
+    -- === SESSION LISTENERS ===
+    if Session and Session.OnExpired then
+        Session.OnExpired:Connect(function()
+            Window:Dialog({
+                Title = "Session Expired",
+                Content = "Please Re-execute.",
+                Buttons = {} -- Soft lock
+            })
+        end)
+    end
 
     -- === LOGIN GATING ===
     local LoginTab = Window:AddTab({ Title = "Login", Icon = "key" })
@@ -45,8 +56,31 @@ function Shell.Boot()
         Title = "Verify Key",
         Description = "Authenticate with Core",
         Callback = function()
-            if Bridge.Signals.TryLogin then
-                Bridge.Signals.TryLogin:Fire(KeyInput_Value)
+            local success, response = ApiClient.Authenticate(KeyInput_Value)
+            if not success then
+                local err = response and response.error
+                if err == "UPDATE_REQUIRED" then
+                    Window:Dialog({
+                        Title = "Update Required",
+                        Content = "Script Update Required. Get new script at [Link].",
+                        Buttons = {}
+                    })
+                elseif err == "SYSTEM_LOCKDOWN" then
+                    Window:Dialog({
+                        Title = "System Lockdown",
+                        Content = "System under maintenance. Check Discord for info.",
+                        Buttons = {}
+                    })
+                else
+                    Fluent:Notify({
+                        Title = "Authentication Failed",
+                        Content = (response and response.message) or "Unknown Error",
+                        Duration = 5
+                    })
+                end
+            else
+                Fluent:Notify({ Title = "Authentication", Content = "Login Successful!", Duration = 3 })
+                Shell.Unlock(response and response.Tier or "User")
             end
         end
     })
@@ -71,7 +105,7 @@ function Shell.Boot()
     -- === UNLOCK LOGIC ===
     function Shell.Unlock(tier)
         -- Create Main Dashboard
-        local UniversalTab = TabsModule.CreateUniversal(Window, Bridge)
+        local UniversalTab = TabsModule.CreateUniversal(Window, Bridge, ApiClient, Fluent)
         local SettingsTab = Window:AddTab({ Title = "Settings", Icon = "settings" })
 
         SaveManager:SetLibrary(Fluent)
@@ -88,18 +122,6 @@ function Shell.Boot()
 
         -- Switch to Universal Tab (Index 2, since Login is 1)
         Window:SelectTab(2)
-    end
-
-    -- === AUTH LISTENERS ===
-    if Bridge.Signals.AuthResult then
-        Bridge.Signals.AuthResult.Event:Connect(function(success, tierOrMsg)
-            if success then
-                Shell.Unlock(tierOrMsg)
-                Fluent:Notify({ Title = "Authentication", Content = "Login Successful!", Duration = 3 })
-            else
-                Fluent:Notify({ Title = "Authentication Failed", Content = tostring(tierOrMsg), Duration = 5 })
-            end
-        end)
     end
 
     if Bridge.Signals.Notification then
