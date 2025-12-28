@@ -17,8 +17,10 @@ if not success then
     return
 end
 local Fluent = result
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(
+"https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet(
+"https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 -- Load Internal Modules (Raw Load from Repo)
 local EventsModule = loadstring(game:HttpGet(REPO .. "Events.lua"))()
@@ -128,11 +130,11 @@ function Shell.Boot()
             local trimmedKey = string.gsub(KeyInput_Value, "^%s*(.-)%s*$", "%1")
 
             if trimmedKey == "" then
-                Fluent:Notify({Title = "Error", Content = "Please enter a key.", Duration = 3})
+                Fluent:Notify({ Title = "Error", Content = "Please enter a key.", Duration = 3 })
                 return
             end
 
-            Fluent:Notify({Title = "Authenticating", Content = "Verifying key...", Duration = 2})
+            Fluent:Notify({ Title = "Authenticating", Content = "Verifying key...", Duration = 2 })
 
             -- Store key for AuthResult callback
             pendingKey = trimmedKey
@@ -144,11 +146,24 @@ function Shell.Boot()
 
     LoginTab:AddButton({
         Title = "Get Key",
-        Description = "Copy link to get a key system",
+        Description = "Get a session-bound key from server",
         Callback = function()
-            local keyLink = "https://link-to-your-key-system.com"
+            Fluent:Notify({
+                Title = "Getting Key Link",
+                Content = "Requesting secure key URL...",
+                Duration = 2
+            })
+
+            -- V3: Request session-bound key link from Core
+            Bridge.Signals.GetKeyLink:Fire()
+        end
+    })
+
+    -- V3: Handle KeyLinkResult from Core
+    Bridge.Signals.KeyLinkResult.Event:Connect(function(success, urlOrError)
+        if success then
             if setclipboard then
-                setclipboard(keyLink)
+                setclipboard(urlOrError)
                 Fluent:Notify({
                     Title = "Success",
                     Content = "Key link copied to clipboard!",
@@ -156,13 +171,19 @@ function Shell.Boot()
                 })
             else
                 Fluent:Notify({
-                    Title = "Error",
-                    Content = "Executor does not support clipboard.",
-                    Duration = 5
+                    Title = "Key Link",
+                    Content = urlOrError,
+                    Duration = 15
                 })
             end
+        else
+            Fluent:Notify({
+                Title = "Error",
+                Content = urlOrError or "Failed to get key link",
+                Duration = 5
+            })
         end
-    })
+    end)
 
     Window:SelectTab(1)
 

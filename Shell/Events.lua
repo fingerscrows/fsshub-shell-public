@@ -2,8 +2,22 @@ local Events = {}
 
 function Events.Init()
     local container = {}
-    local signals = { "ToggleFeature", "TryLogin" } -- Outgoing
-    local listeners = { "Notification", "FeatureState", "AuthResult" } -- Incoming
+
+    -- Outgoing signals (Shell → Core)
+    local signals = {
+        "ToggleFeature", -- Feature toggle request
+        "TryLogin",      -- Auth with key
+        "GetKeyLink"     -- V3: Request session-bound key URL
+    }
+
+    -- Incoming signals (Core → Shell)
+    local listeners = {
+        "Notification",  -- Display notification
+        "FeatureState",  -- Feature state update (revert toggle)
+        "AuthResult",    -- Auth success/failure
+        "KeyLinkResult", -- V3: Key link URL result
+        "StateChange"    -- V3: State machine transition
+    }
 
     container.Signals = {}
 

@@ -4,64 +4,59 @@ function Tabs.CreateDashboard(Window, data)
     local Tab = Window:AddTab({ Title = "Dashboard", Icon = "home" })
 
     -- MOTD Section
-    local MotdSection = Tab:AddSection("Message of the Day")
+    Tab:AddSection("Message of the Day")
     Tab:AddParagraph({
         Title = "System Message",
         Content = (data and (data.MOTD or data.Flags)) or "Welcome to FSSHUB V3 Shell."
     })
 
     -- User Info Section
-    local UserSection = Tab:AddSection("User Information")
+    Tab:AddSection("User Information")
     Tab:AddParagraph({
         Title = "Credentials",
         Content = string.format("Tier: %s\nKey: %s",
             (data and data.Tier) or "Unknown",
-            (data and data.Key) or "Hidden"
+            (data and data.Key and string.sub(data.Key, 1, 15) .. "...") or "Hidden"
         )
     })
 
     -- Session Stats Section
-    local StatsSection = Tab:AddSection("Session Statistics")
-    -- Note: Uptime is dynamic, so we just show the start time or static status for now.
-    -- A real implementation might use a loop to update a label, but standard Fluent Paragraphs are static.
-    -- We will display the connection status.
+    Tab:AddSection("Session Statistics")
     Tab:AddParagraph({
         Title = "Status",
-        Content = string.format("Connection: %s\nUptime: %s",
+        Content = string.format("Connection: %s\nFeatures Available: %d",
             (data and data.Status) or "Active",
-            "Just Started"
+            (data and data.Features and #data.Features) or 0
         )
     })
 
     return Tab
 end
 
-function Tabs.CreateUniversal(Window, Bridge, Fluent)
-    local Tab = Window:AddTab({ Title = "Universal", Icon = "globe" })
-
-    -- Legacy Aesthetics: Verbose Section Name
-    local Section = Tab:AddSection("Movement Dynamics")
+-- V3: Server-driven feature rendering
+function Tabs.CreateUniversal(Window, Bridge, Fluent, features)
+    local Tab = Window:AddTab({ Title = "Features", Icon = "zap" })
 
     -- Track toggles for FeatureState event
     local toggles = {}
+    -- FIXED: isProgrammatic scope - moved outside function, keyed by feature id
+    local isProgrammatic = {}
 
     -- Safe Toggle Pattern Implementation
-    local function CreateSafeToggle(id, title, description)
-        local Toggle = Section:AddToggle(id, {
+    local function CreateSafeToggle(section, id, title, description)
+        local Toggle = section:AddToggle(id, {
             Title = title,
-            Description = description,
+            Description = description or "",
             Default = false
         })
         toggles[id] = Toggle
-        local isProgrammatic = false
+        isProgrammatic[id] = false
 
         Toggle:OnChanged(function()
-            if isProgrammatic then return end
+            if isProgrammatic[id] then return end
 
             local Value = Toggle.Value
-
             -- Fire ToggleFeature event to Core
-            -- Core will handle the API request and respond via FeatureState if it fails
             Bridge.Signals.ToggleFeature:Fire(id, Value)
         end)
     end
@@ -71,16 +66,76 @@ function Tabs.CreateUniversal(Window, Bridge, Fluent)
         local toggle = toggles[featureId]
         if toggle and toggle.Value ~= state then
             -- Programmatic revert (avoid triggering OnChanged)
-            local isProgrammatic = true
+            isProgrammatic[featureId] = true
             toggle:SetValue(state)
-            isProgrammatic = false
+            isProgrammatic[featureId] = false
         end
     end)
 
-    -- Feature Implementations
+    -- V3: Render features from server list
+    if features and #features > 0 then
+        -- Group features by category
+        local categories = {}
+        for _, feature in ipairs(features) do
+            local cat = feature.category or "General"
+            if not categories[cat] then
+                categories[cat] = {}
+            end
+            table.insert(categories[cat], feature)
+        end
+
+        -- Create sections for each category
+        for catName, catFeatures in pairs(categories) do
+            local Section = Tab:AddSection(catName)
+            for _, feature in ipairs(catFeatures) do
+                CreateSafeToggle(Section, feature.id, feature.name, feature.description)
+            end
+        end
+    else
+        -- Fallback: No features available
+        Tab:AddSection("No Features")
+        Tab:AddParagraph({
+            Title = "Notice",
+            Content = "No features available for your tier or game not authorized."
+        })
+    end
+
+    return Tab
+end
+
+-- Legacy CreateUniversal for backward compatibility
+function Tabs.CreateUniversalLegacy(Window, Bridge, Fluent)
+    local Tab = Window:AddTab({ Title = "Universal", Icon = "globe" })
+    local Section = Tab:AddSection("Movement Dynamics")
+    local toggles = {}
+    local isProgrammatic = {}
+
+    local function CreateSafeToggle(id, title, description)
+        local Toggle = Section:AddToggle(id, {
+            Title = title,
+            Description = description,
+            Default = false
+        })
+        toggles[id] = Toggle
+        isProgrammatic[id] = false
+
+        Toggle:OnChanged(function()
+            if isProgrammatic[id] then return end
+            Bridge.Signals.ToggleFeature:Fire(id, Toggle.Value)
+        end)
+    end
+
+    Bridge.Signals.FeatureState.Event:Connect(function(featureId, state)
+        if toggles[featureId] and toggles[featureId].Value ~= state then
+            isProgrammatic[featureId] = true
+            toggles[featureId]:SetValue(state)
+            isProgrammatic[featureId] = false
+        end
+    end)
+
     CreateSafeToggle("speedwalk", "Speed Walk", "Increases movement speed significantly.")
     CreateSafeToggle("jumppower", "Jump Power", "Boosts jump height for better navigation.")
-    CreateSafeToggle("gravity", "Gravity Control", "Alters gravity to allow floating or heavy falling.")
+    CreateSafeToggle("gravity", "Gravity Control", "Alters gravity.")
 
     return Tab
 end
