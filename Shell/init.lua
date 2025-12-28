@@ -24,7 +24,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 local EventsModule = loadstring(game:HttpGet(REPO .. "Events.lua"))()
 local TabsModule = loadstring(game:HttpGet(REPO .. "UI/Tabs.lua"))()
 
-function Shell.Boot(ApiClient, Session)
+function Shell.Boot()
     -- === THEME SETUP ===
     Fluent.Options.Accent = Color3.fromRGB(0, 255, 255) -- Cyan Neon
 
@@ -54,30 +54,21 @@ function Shell.Boot(ApiClient, Session)
     -- EXPOSE GLOBAL BRIDGE
     getgenv().FSSHUB_SHELL = { Events = Bridge.Signals, Instance = Window }
 
-    -- === SESSION LISTENERS ===
-    if Session and Session.OnExpired then
-        Session.OnExpired:Connect(function()
-            Window:Dialog({
-                Title = "Session Expired",
-                Content = "Please Re-execute.",
-                Buttons = {} -- Soft lock
-            })
-        end)
-    end
+    -- Store pending key for AuthResult callback
+    local pendingKey = nil
 
     -- === DYNAMIC UNLOCK FUNCTION ===
-    function Shell.Unlock(Window, response)
+    function Shell.Unlock(Window, tier, key)
         -- Transition to Main Phase
-        SafeSetSubTitle("FSSHUB V3 - " .. (response.Tier or "User"))
+        SafeSetSubTitle("FSSHUB V3 - " .. (tier or "User"))
+
+        local response = { Tier = tier, Key = key }
 
         -- 1. Dashboard (Dynamic Content)
-        -- Pass the auth response to populate User Info, MOTD, etc.
-        -- Ensure response has 'Key' if we want to display it, otherwise pass KeyInput_Value if accessible.
-        -- For now, we assume response contains necessary display info.
         TabsModule.CreateDashboard(Window, response)
 
-        -- 2. Features (Universal)
-        TabsModule.CreateUniversal(Window, Bridge, ApiClient, Fluent)
+        -- 2. Features (Universal) - Now uses Bridge for feature requests
+        TabsModule.CreateUniversal(Window, Bridge, Fluent)
 
         -- 3. Settings Tab
         local SettingsTab = Window:AddTab({ Title = "Settings", Icon = "settings" })
@@ -91,19 +82,28 @@ function Shell.Boot(ApiClient, Session)
         InterfaceManager:BuildInterfaceSection(SettingsTab)
         SaveManager:BuildConfigSection(SettingsTab)
 
-        -- Switch to Dashboard (Index 2, assuming Login is 1. Wait, if we added tabs, Login is still there?)
-        -- The requirement was "Menerapkan alur Auth-Locked (Hanya tab Login yang terlihat di awal)."
-        -- "Menyuntikkan tab Dashboard... setelah sukses login."
-        -- Usually we might want to Destroy the Login tab or just switch away.
-        -- Fluent doesn't support destroying tabs easily. We just switch.
-        Window:SelectTab(2) -- Dashboard is the first injected tab, so it's at index 2 (Login is 1)
+        -- Switch to Dashboard
+        Window:SelectTab(2)
 
         Fluent:Notify({
             Title = "Welcome",
-            Content = "System Unlocked. " .. (response.Tier or "User") .. " Access Granted.",
+            Content = "System Unlocked. " .. (tier or "User") .. " Access Granted.",
             Duration = 5
         })
     end
+
+    -- === AUTH RESULT LISTENER (From Core) ===
+    Bridge.Signals.AuthResult.Event:Connect(function(success, tierOrError)
+        if success then
+            Shell.Unlock(Window, tierOrError, pendingKey)
+        else
+            Fluent:Notify({
+                Title = "Authentication Failed",
+                Content = tierOrError or "Unknown Error",
+                Duration = 5
+            })
+        end
+    end)
 
     -- === LOGIN TAB ===
     local LoginTab = Window:AddTab({ Title = "Login", Icon = "key" })
@@ -134,36 +134,11 @@ function Shell.Boot(ApiClient, Session)
 
             Fluent:Notify({Title = "Authenticating", Content = "Verifying key...", Duration = 2})
 
-            -- AUTHENTICATE
-            local success, response = ApiClient.Authenticate(trimmedKey)
+            -- Store key for AuthResult callback
+            pendingKey = trimmedKey
 
-            if not success then
-                local err = response and response.error
-                if err == "UPDATE_REQUIRED" then
-                    Window:Dialog({
-                        Title = "Update Required",
-                        Content = "Script Update Required. Get new script at [Link].",
-                        Buttons = {}
-                    })
-                elseif err == "SYSTEM_LOCKDOWN" then
-                    Window:Dialog({
-                        Title = "System Lockdown",
-                        Content = "System under maintenance. Check Discord for info.",
-                        Buttons = {}
-                    })
-                else
-                    Fluent:Notify({
-                        Title = "Authentication Failed",
-                        Content = (response and response.message) or "Unknown Error",
-                        Duration = 5
-                    })
-                end
-            else
-                -- Inject Key into response for Dashboard display if not present
-                if response then response.Key = trimmedKey end
-
-                Shell.Unlock(Window, response)
-            end
+            -- Fire TryLogin event to Core (Core will call ApiClient.Authenticate)
+            Bridge.Signals.TryLogin:Fire(trimmedKey)
         end
     })
 
