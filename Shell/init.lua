@@ -25,6 +25,8 @@ local InterfaceManager = loadstring(game:HttpGet(
 -- Load Internal Modules (Raw Load from Repo)
 local EventsModule = loadstring(game:HttpGet(REPO .. "Events.lua"))()
 local TabsModule = loadstring(game:HttpGet(REPO .. "UI/Tabs.lua"))()
+local RemoteConfig = loadstring(game:HttpGet(REPO .. "RemoteConfig.lua"))()
+local SessionWatchdog = loadstring(game:HttpGet(REPO .. "SessionWatchdog.lua"))()
 
 function Shell.Boot()
     -- === THEME SETUP ===
@@ -87,6 +89,21 @@ function Shell.Boot()
         -- Switch to Dashboard
         Window:SelectTab(2)
 
+        -- Start session watchdog
+        if SessionWatchdog then
+            SessionWatchdog.Start()
+        end
+
+        -- Show MOTD if available
+        local motd = RemoteConfig and RemoteConfig.GetMOTD()
+        if motd then
+            Fluent:Notify({
+                Title = "Message of the Day",
+                Content = motd,
+                Duration = 8
+            })
+        end
+
         Fluent:Notify({
             Title = "Welcome",
             Content = "System Unlocked. " .. (tier or "User") .. " Access Granted.",
@@ -94,9 +111,23 @@ function Shell.Boot()
         })
     end
 
+    -- === FETCH REMOTE CONFIG ===
+    if RemoteConfig then
+        RemoteConfig.Fetch()
+        if RemoteConfig.IsMaintenance() then
+            Fluent:Notify({
+                Title = "⚠️ Maintenance",
+                Content = RemoteConfig.GetMOTD() or "System under maintenance",
+                Duration = 10
+            })
+        end
+    end
+
     -- === AUTH RESULT LISTENER (From Core) ===
     Bridge.Signals.AuthResult.Event:Connect(function(success, tierOrError, features)
         if success then
+            -- Refresh config on auth success
+            if RemoteConfig then RemoteConfig.Fetch() end
             Shell.Unlock(Window, tierOrError, pendingKey, features)
         else
             Fluent:Notify({
