@@ -18,9 +18,9 @@ if not success then
 end
 local Fluent = result
 local SaveManager = loadstring(game:HttpGet(
-"https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet(
-"https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+    "https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 -- Load Internal Modules (Raw Load from Repo)
 local EventsModule = loadstring(game:HttpGet(REPO .. "Events.lua"))()
@@ -60,7 +60,7 @@ function Shell.Boot()
     local pendingKey = nil
 
     -- === DYNAMIC UNLOCK FUNCTION ===
-    function Shell.Unlock(Window, tier, key)
+    function Shell.Unlock(Window, tier, key, features)
         -- Transition to Main Phase
         SafeSetSubTitle("FSSHUB V3 - " .. (tier or "User"))
 
@@ -70,7 +70,7 @@ function Shell.Boot()
         TabsModule.CreateDashboard(Window, response)
 
         -- 2. Features (Universal) - Now uses Bridge for feature requests
-        TabsModule.CreateUniversal(Window, Bridge, Fluent)
+        TabsModule.CreateUniversal(Window, Bridge, Fluent, features or {})
 
         -- 3. Settings Tab
         local SettingsTab = Window:AddTab({ Title = "Settings", Icon = "settings" })
@@ -95,9 +95,9 @@ function Shell.Boot()
     end
 
     -- === AUTH RESULT LISTENER (From Core) ===
-    Bridge.Signals.AuthResult.Event:Connect(function(success, tierOrError)
+    Bridge.Signals.AuthResult.Event:Connect(function(success, tierOrError, features)
         if success then
-            Shell.Unlock(Window, tierOrError, pendingKey)
+            Shell.Unlock(Window, tierOrError, pendingKey, features)
         else
             Fluent:Notify({
                 Title = "Authentication Failed",
