@@ -227,7 +227,6 @@ function Shell._createMainMenu()
     -- Tabs (Dummy)
     local tabs = { "AimBot", "Visuals", "Misc", "Settings" }
     for i, tab in ipairs(tabs) do
-        local btn = instance.new("TextButton") -- intentional casing error for validation later? No, fix standard
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, -20, 0, 35)
         btn.Position = UDim2.new(0, 10, 0, 50 + (i * 40))
