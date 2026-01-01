@@ -8,12 +8,12 @@
     - Main Menu: Unlocked after valid key received
 
     @module Shell
-    @version 3.1.0
+    @version 3.2.0
     @public true
 ]]
 
 local Shell = {}
-Shell.Version = "3.1.0"
+Shell.Version = "3.2.0"
 
 -- Services
 local Players = game:GetService("Players")
@@ -25,7 +25,7 @@ local UserInputService = game:GetService("UserInputService")
 local _gui = nil
 local _authFrame = nil
 local _mainFrame = nil
-local _notification = nil
+local _notificationContainer = nil
 local _connections = {}
 
 -- Event folder
@@ -40,7 +40,8 @@ local Colors = {
     Text = Color3.fromRGB(255, 255, 255),
     TextGray = Color3.fromRGB(150, 150, 160),
     Error = Color3.fromRGB(255, 80, 80),
-    Success = Color3.fromRGB(50, 255, 100)
+    Success = Color3.fromRGB(50, 255, 100),
+    Input = Color3.fromRGB(30, 30, 45)
 }
 
 --[[
@@ -60,7 +61,7 @@ function Shell.init(eventFolder)
     -- Check initial status
     Shell._fireEvent("session:status:request")
 
-    print("[Shell] GUI Initialized")
+    print("[Shell] GUI Initialized v" .. Shell.Version)
     return true
 end
 
@@ -87,8 +88,19 @@ function Shell._createUI()
     -- 2. Create Main Menu (Hidden initially)
     Shell._createMainMenu()
 
-    -- 3. Create Notification Overlay
-    Shell._createNotificationUtils()
+    -- 3. Notification Container
+    _notificationContainer = Instance.new("Frame")
+    _notificationContainer.Name = "NotificationContainer"
+    _notificationContainer.Size = UDim2.new(0, 300, 1, -20)
+    _notificationContainer.Position = UDim2.new(1, -320, 0, 10)
+    _notificationContainer.BackgroundTransparency = 1
+    _notificationContainer.Parent = _gui
+
+    local notifLayout = Instance.new("UIListLayout")
+    notifLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    notifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+    notifLayout.Padding = UDim.new(0, 10)
+    notifLayout.Parent = _notificationContainer
 end
 
 --[[
@@ -97,8 +109,8 @@ end
 function Shell._createAuthGateway()
     _authFrame = Instance.new("Frame")
     _authFrame.Name = "AuthGateway"
-    _authFrame.Size = UDim2.new(0, 320, 0, 250)
-    _authFrame.Position = UDim2.new(0.5, -160, 0.5, -125)
+    _authFrame.Size = UDim2.new(0, 320, 0, 220)
+    _authFrame.Position = UDim2.new(0.5, -160, 0.5, -110)
     _authFrame.BackgroundColor3 = Colors.BgDark
     _authFrame.BorderSizePixel = 0
     _authFrame.Visible = true -- Start visible
@@ -106,8 +118,6 @@ function Shell._createAuthGateway()
 
     Shell._addCorner(_authFrame, 16)
     Shell._addStroke(_authFrame, Colors.Accent, 0.3)
-
-    -- Draggable
     Shell._makeDraggable(_authFrame)
 
     -- Header
@@ -120,74 +130,69 @@ function Shell._createAuthGateway()
     title.TextSize = 20
     title.Parent = _authFrame
 
-    -- Status
-    local status = Instance.new("TextLabel")
-    status.Name = "StatusLabel"
-    status.Size = UDim2.new(1, 0, 0, 20)
-    status.Position = UDim2.new(0, 0, 0, 50)
-    status.BackgroundTransparency = 1
-    status.Text = "Waiting for initialization..."
-    status.TextColor3 = Colors.TextGray
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    status.Parent = _authFrame
+    -- Instructions
+    local instructions = Instance.new("TextLabel")
+    instructions.Size = UDim2.new(1, -40, 0, 30)
+    instructions.Position = UDim2.new(0, 20, 0, 45)
+    instructions.BackgroundTransparency = 1
+    instructions.Text = "Please complete verification to continue"
+    instructions.TextColor3 = Colors.TextGray
+    instructions.Font = Enum.Font.FromMono
+    instructions.TextSize = 11
+    instructions.Parent = _authFrame
 
     -- Buttons Container
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -40, 0, 150)
+    container.Size = UDim2.new(1, -40, 0, 120)
     container.Position = UDim2.new(0, 20, 0, 80)
     container.BackgroundTransparency = 1
     container.Parent = _authFrame
 
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 10)
-    layout.Parent = container
-
     -- 1. Get Key Button
-    local getKeyBtn = Shell._createButton(container, "GetKeyBtn", "GET KEY LINK", Colors.Accent)
+    local getKeyBtn = Shell._createButton(container, "GetKeyBtn", "GET KEY", Colors.Accent, 1)
     getKeyBtn.MouseButton1Click:Connect(function()
         Shell._fireEvent("getkey:request")
-        status.Text = "Requesting link..."
+        -- Visual feedback
+        getKeyBtn.Text = "REQUESTING..."
+        task.delay(1, function() getKeyBtn.Text = "GET KEY" end)
     end)
 
     -- 2. Input Key Box
     local keyInput = Instance.new("TextBox")
     keyInput.Name = "KeyInput"
-    keyInput.Size = UDim2.new(1, 0, 0, 40)
-    keyInput.BackgroundColor3 = Colors.BgPanel
+    keyInput.Size = UDim2.new(1, 0, 0, 35)
+    keyInput.Position = UDim2.new(0, 0, 0, 45)
+    keyInput.BackgroundColor3 = Colors.Input
     keyInput.TextColor3 = Colors.Text
     keyInput.PlaceholderText = "Paste Key Here..."
+    keyInput.PlaceholderColor3 = Colors.TextGray
     keyInput.Text = ""
     keyInput.Font = Enum.Font.Code
-    keyInput.TextSize = 14
+    keyInput.TextSize = 13
     keyInput.Parent = container
     Shell._addCorner(keyInput, 8)
+    Shell._addStroke(keyInput, Colors.BgPanel, 0.5)
+
+    keyInput.Focused:Connect(function()
+        Shell._animateStroke(keyInput, Colors.Accent, 0.5)
+    end)
+
+    keyInput.FocusLost:Connect(function()
+        Shell._animateStroke(keyInput, Colors.BgPanel, 0.5)
+    end)
 
     -- 3. Login Button
-    local loginBtn = Shell._createButton(container, "LoginBtn", "LOGIN", Colors.BgPanel)
-    loginBtn.TextColor3 = Colors.TextGray
+    local loginBtn = Shell._createButton(container, "LoginBtn", "LOGIN", Colors.BgPanel, 2)
+    loginBtn.Position = UDim2.new(0, 0, 0, 90)
+    loginBtn.TextColor3 = Colors.Accent
 
     loginBtn.MouseButton1Click:Connect(function()
         local key = keyInput.Text
         if #key > 5 then
             Shell._fireEvent("key:enter", key)
-            status.Text = "Verifying key..."
         else
-            Shell.notify("Please enter a valid key", "error")
+            Shell._invalidKeyEffect()
         end
-    end)
-
-    -- Close button (Minimizes to top bar)
-    local close = Instance.new("TextButton")
-    close.Size = UDim2.new(0, 30, 0, 30)
-    close.Position = UDim2.new(1, -35, 0, 10)
-    close.BackgroundTransparency = 1
-    close.Text = "X"
-    close.TextColor3 = Colors.TextGray
-    close.Font = Enum.Font.GothamBold
-    close.Parent = _authFrame
-    close.MouseButton1Click:Connect(function()
-        _gui.Enabled = not _gui.Enabled
     end)
 end
 
@@ -213,9 +218,9 @@ function Shell._createMainMenu()
     sidebar.BackgroundColor3 = Colors.BgPanel
     sidebar.BorderSizePixel = 0
     sidebar.Parent = _mainFrame
-    Shell._addCorner(sidebar, 16) -- Rounded left corners
+    Shell._addCorner(sidebar, 16)
 
-    -- Correction for right corners of sidebar
+    -- Mask for smooth integration
     local mask = Instance.new("Frame")
     mask.Size = UDim2.new(0, 20, 1, 0)
     mask.Position = UDim2.new(1, -10, 0, 0)
@@ -224,7 +229,7 @@ function Shell._createMainMenu()
     mask.ZIndex = 0
     mask.Parent = sidebar
 
-    -- Tabs (Dummy)
+    -- Tabs
     local tabs = { "AimBot", "Visuals", "Misc", "Settings" }
     for i, tab in ipairs(tabs) do
         local btn = Instance.new("TextButton")
@@ -257,41 +262,24 @@ function Shell._createMainMenu()
     welcome.TextXAlignment = Enum.TextXAlignment.Left
     welcome.Parent = content
 
-    -- User Info
-    local info = Instance.new("TextLabel")
-    info.Name = "UserInfo"
-    info.Text = "Tier: FREE | Time: 12h 00m"
-    info.Size = UDim2.new(1, 0, 0, 20)
-    info.Position = UDim2.new(0, 0, 0, 35)
-    info.BackgroundTransparency = 1
-    info.TextColor3 = Colors.Accent
-    info.Font = Enum.Font.Code
-    info.TextSize = 14
-    info.TextXAlignment = Enum.TextXAlignment.Left
-    info.Parent = content
-
-    -- Dummy Toggle
-    local toggle = Shell._createButton(content, "DummyToggle", "Enable Aimbot (Dummy)", Colors.BgPanel)
-    toggle.Position = UDim2.new(0, 0, 0, 80)
+    -- Buttons
+    local toggle = Shell._createButton(content, "Toggle", "Enable Aimbot", Colors.BgPanel, 0)
     toggle.Size = UDim2.new(0, 200, 0, 40)
+    toggle.Position = UDim2.new(0, 0, 0, 60)
     toggle.TextColor3 = Colors.Text
 
     -- Logout
-    local logout = Shell._createButton(content, "LogoutBtn", "Log Out", Colors.Error)
-    logout.Position = UDim2.new(0, 0, 1, -40)
+    local logout = Shell._createButton(content, "Logout", "Log Out", Colors.Error, 0)
     logout.Size = UDim2.new(0, 100, 0, 30)
+    logout.Position = UDim2.new(0, 0, 1, -40)
     logout.MouseButton1Click:Connect(function()
         _gui:Destroy()
     end)
 end
 
---[[
-    Transition to Main Menu
-]]
-function Shell.unlockMainMenu(keyData)
-    print("[Shell] Unlocking Main Menu...")
+--[[ Transitions & Effects ]]
 
-    -- Hide Auth
+function Shell.unlockMainMenu(keyData)
     if _authFrame then
         TweenService:Create(_authFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
             Position = UDim2.new(0.5, -160, 1.5, 0)
@@ -300,72 +288,150 @@ function Shell.unlockMainMenu(keyData)
         _authFrame.Visible = false
     end
 
-    -- Show Main
     if _mainFrame then
         _mainFrame.Visible = true
-        _mainFrame.Position = UDim2.new(0.5, -250, 0.5, -165) -- slightly off for effect
         _mainFrame.BackgroundTransparency = 1
-
-        -- Update Info
-        local info = _mainFrame:FindFirstChild("Content"):FindFirstChild("UserInfo")
-        if info and keyData then
-            info.Text = string.format("Tier: %s | Active", string.upper(keyData.tier or "FREE"))
-        end
-
-        -- Animate In
         TweenService:Create(_mainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Position = UDim2.new(0.5, -250, 0.5, -175),
             BackgroundTransparency = 0
         }):Play()
     end
-
-    Shell.notify("Welcome back!", "success")
+    Shell.notify("Welcome back! Key active.", "success")
 end
 
---[[
-    Event Setup
-]]
+function Shell._invalidKeyEffect()
+    local input = _authFrame:FindFirstChild("Frame"):FindFirstChild("KeyInput")
+    if input then
+        -- Shake
+        local pos = input.Position
+        for i = 1, 6 do
+            input.Position = pos + UDim2.new(0, math.random(-5, 5), 0, 0)
+            task.wait(0.05)
+        end
+        input.Position = pos
+
+        -- Red Border
+        Shell._animateStroke(input, Colors.Error, 0)
+        input.Text = ""
+        input.PlaceholderText = "Invalid Key!"
+        input.PlaceholderColor3 = Colors.Error
+
+        task.delay(1.5, function()
+            Shell._animateStroke(input, Colors.BgPanel, 0.5)
+            input.PlaceholderText = "Paste Key Here..."
+            input.PlaceholderColor3 = Colors.TextGray
+        end)
+    end
+    Shell.notify("Invalid Key", "error")
+end
+
+function Shell._animateStroke(obj, color, alpha)
+    local stroke = obj:FindFirstChild("UIStroke")
+    if stroke then
+        TweenService:Create(stroke, TweenInfo.new(0.3), {
+            Color = color,
+            Transparency = alpha
+        }):Play()
+    end
+end
+
+--[[ Notifications ]]
+
+function Shell.notify(msg, type)
+    if not _notificationContainer then return end
+
+    local color = type == "error" and Colors.Error or (type == "success" and Colors.Success or Colors.Accent)
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = Colors.BgPanel
+    frame.BorderSizePixel = 0
+    frame.Parent = _notificationContainer
+    Shell._addCorner(frame, 6)
+    Shell._addStroke(frame, color, 0.5)
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, -20, 1, 0)
+    text.Position = UDim2.new(0, 10, 0, 0)
+    text.BackgroundTransparency = 1
+    text.Text = msg
+    text.TextColor3 = Colors.Text
+    text.Font = Enum.Font.Gotham
+    text.TextSize = 14
+    text.TextXAlignment = Enum.TextXAlignment.Left
+    text.Parent = frame
+
+    -- Animate In
+    frame.BackgroundTransparency = 1
+    text.TextTransparency = 1
+    TweenService:Create(frame, TweenInfo.new(0.3), { BackgroundTransparency = 0.1 }):Play()
+    TweenService:Create(text, TweenInfo.new(0.3), { TextTransparency = 0 }):Play()
+
+    -- Cleanup
+    task.delay(3, function()
+        TweenService:Create(frame, TweenInfo.new(0.3), { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(text, TweenInfo.new(0.3), { TextTransparency = 1 }):Play()
+        task.wait(0.3)
+        frame:Destroy()
+    end)
+end
+
+function Shell._makeDraggable(frame)
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
+end
+
+--[[ Event Setup ]]
+
 function Shell._setupEvents()
-    -- key:received -> Unlock Main Menu
+    -- key:received -> Unlock
     Shell._listenEvent("key:received", function(data)
         Shell.unlockMainMenu(data)
     end)
 
-    -- session:status -> Update Auth Status
+    -- session:status -> Auto login if completed
     Shell._listenEvent("session:status", function(data)
-        local statusLabel = _authFrame:FindFirstChild("StatusLabel")
-        if statusLabel and data.status then
-            statusLabel.Text = data.status
-        end
-
-        -- If already completed/active, unlock
         if data.status == "COMPLETED" or data.status == "Session Active" or data.hasKey then
             Shell.unlockMainMenu(data)
         end
+        -- We ignore other statuses (PENDING etc) to keep UI clean as requested
     end)
 
-    -- session:url -> Show URL Notification & Update Status
+    -- session:url -> Notify
     Shell._listenEvent("session:url", function(data)
         if data.url then
-            Shell.notify("URL copied to clipboard!", "success")
+            Shell.notify("Link copied to clipboard!", "success")
             pcall(function() setclipboard(data.url) end)
-
-            local statusLabel = _authFrame:FindFirstChild("StatusLabel")
-            if statusLabel then
-                statusLabel.Text = "Please verify in browser..."
-            end
         end
     end)
 
-    -- error -> Notify
+    -- error -> Invalid Key Effect
     Shell._listenEvent("error", function(data)
-        Shell.notify(data.message, "error")
-        local statusLabel = _authFrame:FindFirstChild("StatusLabel")
-        if statusLabel then statusLabel.Text = "Error: " .. data.message end
+        Shell._invalidKeyEffect()
+        -- Also show specific message if needed
+        -- Shell.notify(data.message, "error")
     end)
 end
 
---[[ Helpers ]]
 function Shell._listenEvent(name, func)
     local ev = _eventFolder:FindFirstChild(name)
     if ev then
@@ -378,7 +444,7 @@ function Shell._fireEvent(name, ...)
     if ev then ev:Fire(...) end
 end
 
-function Shell._createButton(parent, name, text, color)
+function Shell._createButton(parent, name, text, color, order)
     local btn = Instance.new("TextButton")
     btn.Name = name
     btn.Text = text
@@ -388,6 +454,7 @@ function Shell._createButton(parent, name, text, color)
     btn.TextSize = 14
     btn.TextColor3 = Colors.BgDark
     btn.Parent = parent
+    -- btn.LayoutOrder = order -- container uses UIListLayout
     Shell._addCorner(btn, 8)
     return btn
 end
@@ -404,42 +471,6 @@ function Shell._addStroke(obj, color, alpha)
     s.Transparency = alpha or 0
     s.Thickness = 1
     s.Parent = obj
-end
-
-function Shell._makeDraggable(frame)
-    local dragging, dragInput, dragStart, startPos
-    frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-        end
-    end)
-    frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-    end)
-end
-
-function Shell.notify(msg, type)
-    print("[Notify]", msg)
-    -- Simple notification logic can be added here
-    -- For now just print to console as fallback
-end
-
-function Shell._createNotificationUtils()
-    -- Create notification container if needed
 end
 
 return Shell
