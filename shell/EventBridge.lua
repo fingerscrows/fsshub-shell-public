@@ -64,19 +64,26 @@ end
 
 --[[
     Create event folder with all BindableEvents
+    Checks if already exists first (from Loader)
 
     @return Instance - Event folder
 ]]
 function EventBridge._createEventFolder()
-    local folder = Instance.new("Folder")
-    folder.Name = "FSSHUB_Events"
-    folder.Parent = game:GetService("ReplicatedStorage")
+    local folder = game:GetService("ReplicatedStorage"):FindFirstChild("FSSHUB_Events")
 
-    -- Create all events
+    if not folder then
+        folder = Instance.new("Folder")
+        folder.Name = "FSSHUB_Events"
+        folder.Parent = game:GetService("ReplicatedStorage")
+    end
+
+    -- Create all events if missing
     for name, eventName in pairs(EventBridge.Events) do
-        local event = Instance.new("BindableEvent")
-        event.Name = eventName
-        event.Parent = folder
+        if not folder:FindFirstChild(eventName) then
+            local event = Instance.new("BindableEvent")
+            event.Name = eventName
+            event.Parent = folder
+        end
     end
 
     return folder
