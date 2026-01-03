@@ -137,7 +137,7 @@ function Shell._createAuthGateway()
     instructions.BackgroundTransparency = 1
     instructions.Text = "Please complete verification to continue"
     instructions.TextColor3 = Colors.TextGray
-    instructions.Font = Enum.Font.FromMono
+    instructions.Font = Enum.Font.RobotoMono
     instructions.TextSize = 11
     instructions.Parent = _authFrame
 
