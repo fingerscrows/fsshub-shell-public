@@ -6,61 +6,52 @@ This repository contains the **Stateless UI Shell** for **FSSHUB V3**, built usi
 
 This project is strictly the **UI layer**. It does not contain the core game logic, which is loaded dynamically from the private core repository.
 
-## Dependency Injection (Important)
+## Architecture
+
+**The "Remote Control" Pattern**
+
+This Shell operates as a "Remote Control" for the private Core ("TV Box").
+- **Stateless:** The Shell does not execute game logic (e.g., it doesn't run the `SpeedHack` loop).
+- **Event-Driven:** It sends signals (e.g., "Toggle Speed") to the Core via a **Bridge**.
+- **Reactive:** It listens for signals from the Core (e.g., "Auth Success", "Feature State Update") to update the UI.
+
+For more details, see [docs/architecture.md](docs/architecture.md).
+
+## Integration & Boot
 
 **⚠️ This Shell cannot run standalone.**
 
-The `Shell/init.lua` module is designed to be required and executed by a private **Loader**. It follows a **Dependency Injection** pattern where the Loader must inject the following instances:
+It is designed to be loaded by a private **Loader** script.
 
-*   **`ApiClient`**: Handles all network communication with the Cloudflare Worker backend.
-*   **`Session`**: Manages the current user's session data and authentication state.
+**Boot Process:**
+1. **Raw Load:** The Loader fetches `Shell/init.lua` via `loadstring`.
+2. **Boot:** The Loader calls `Shell.Boot()`.
+3. **Bridge:** The Shell exposes `getgenv().FSSHUB_SHELL`. The Core connects to the events in `FSSHUB_SHELL.Events` to handle logic.
 
-**Entry Point Signature:**
+**Entry Point:**
 ```lua
-return function(ApiClient, Session)
-    -- UI Logic starts here
-end
+local Shell = loadstring(game:HttpGet(".../Shell/init.lua"))()
+Shell.Boot() -- Initializes UI and Event Bridge
 ```
-
-Attempting to run `Shell/init.lua` directly without these dependencies will result in errors.
 
 ## Directory Structure
 
-*   **`Fluent/`**: Contains the full source code of the Fluent UI Library.
-    *   `src/`: The core library modules (renamed from `Fluent-1.1.0` to support modular requiring).
-*   **`Shell/`**: Contains the specific dashboard logic for FSSHUB.
-    *   `init.lua`: The main entry point that constructs the UI, handles tabs, and connects events.
-    *   `Events.lua`: A lightweight Signal class for internal UI event handling.
+*   **`Shell/`**: Contains the source code for the Shell.
+    *   `init.lua`: Main entry point.
+    *   `Events.lua`: Defines the Event Bridge (Signal system).
+    *   `UI/`: UI Components and Tab logic.
+    *   `RemoteConfig.lua`: Handling of dynamic MOTD/Maintenance checks.
+*   **`Fluent/`**: Local copy of the UI library (Reference/Dev). *Note: Runtime loads Fluent remotely.*
 
 ## Customization
 
 ### Theme
-The UI uses a **Cyber Neon** theme by default. You can customize this in `Shell/init.lua` within the `Fluent:Construct` options:
+The UI uses a **Cyber Neon** theme by default. You can customize this in `Shell/init.lua`.
 
-```lua
-Fluent:Construct({
-    Title = "FSS HUB V3",
-    Theme = "Dark", -- Base theme
-    Accent = Color3.fromRGB(0, 255, 255), -- Neon Cyan Accent
-    -- ...
-})
-```
-
-### Adding Buttons
-To add new functionality, locate the relevant Tab section in `Shell/init.lua` (e.g., `Tabs.Main`).
-
-Example:
-```lua
-Tabs.Main:AddButton({
-    Title = "New Feature",
-    Description = "Description of the feature",
-    Callback = function()
-        -- Handle click
-    end
-})
-```
+### Adding Features
+Features are dynamically rendered based on the data received from the Core during the `Unlock` phase. See `Shell/UI/Tabs.lua`.
 
 ## Credits
 
-*   **Fluent UI Library**: Created by [dawid-scripts](https://github.com/dawid-scripts). Used as the foundation for the UI interface.
-*   **FSSHUB Team**: For the V3 Architecture and implementation.
+*   **Fluent UI Library**: Created by [dawid-scripts](https://github.com/dawid-scripts).
+*   **FSSHUB Team**: V3 Architecture.
